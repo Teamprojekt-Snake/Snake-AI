@@ -1,19 +1,16 @@
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Point;
-import java.awt.Toolkit;
+import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.LinkedList;
 import java.util.List;
 
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.Timer;
+import javax.swing.*;
 
 public class BoardPanel extends JPanel {
 
     private final int TILE = 20;
+    private int score = 0;
+
 
     // Schlange, besteht aus Punkten
     private final List<Point> snake = new LinkedList<>();
@@ -62,6 +59,7 @@ public class BoardPanel extends JPanel {
 
     private void initGame() {
         snake.clear();
+        score = 0;
         snake.add(new Point(5, 5));
 
         dx = 0;
@@ -80,7 +78,7 @@ public class BoardPanel extends JPanel {
         running = true;
 
         // Timer: alle 200ms wird update() + repaint() aufgerufen
-        gameTimer = new Timer(200, e -> {
+        gameTimer = new Timer(70, e -> {
             update();
             repaint();
         });
@@ -92,7 +90,7 @@ public class BoardPanel extends JPanel {
     private void update() {
         if (dx == 0 && dy == 0) return;
 
-        Point head = snake.get(0);
+        Point head = snake.getFirst();
         Point newHead = new Point(head.x + dx, head.y + dy);
 
         LinkedList<Point> snakeCopy = new LinkedList<>(snake);
@@ -112,11 +110,12 @@ public class BoardPanel extends JPanel {
 
         boolean ateApple = newHead.equals(apple);
 
-        snake.add(0, newHead);
+        snake.addFirst(newHead);
 
         if (!ateApple) {
-            snake.remove(snake.size() - 1);
+            snake.removeLast();
         } else {
+            score ++;
             GameLogger.info("Apple eaten! Snake length: " + snake.size());
             spawnApple();
         }
@@ -133,7 +132,7 @@ public class BoardPanel extends JPanel {
         String[] options = {"Neues Spiel", "Spiel Beenden"};
         int choice = JOptionPane.showOptionDialog(
                 this,
-                "Game Over! Score: " + (snake.size() - 1),
+                "Game Over! Score: " + score,
                 "Snake",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.INFORMATION_MESSAGE,
@@ -163,6 +162,12 @@ public class BoardPanel extends JPanel {
         for (Point p : snake) {
             g.fillRect(p.x * TILE, p.y * TILE, TILE, TILE);
         }
+
+        //Score
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Comic Sans MS", Font.BOLD, 20));
+        g.drawString("Score: " + score, 10, 30);
+
 
         Toolkit.getDefaultToolkit().sync();
     }
