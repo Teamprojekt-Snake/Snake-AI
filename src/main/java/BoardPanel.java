@@ -15,7 +15,7 @@ public class BoardPanel extends JPanel implements Runnable {
     private final int TILE = 20;
 
     // Schlange, besteht aus Punkten
-    private List<Point> snake = new LinkedList<>();
+    private final List<Point> snake = new LinkedList<>();
 
     // Richtung in Grid-Steps
     private int dx = 0;
@@ -31,6 +31,9 @@ public class BoardPanel extends JPanel implements Runnable {
         int maxX = getWidth() / TILE;
         int maxY = getHeight() / TILE;
 
+        if (maxX <= 0) maxX = 20;  // fallback
+        if (maxY <= 0) maxY = 20;
+
         Point newApple;
 
         do {
@@ -41,10 +44,11 @@ public class BoardPanel extends JPanel implements Runnable {
         } while (snake.contains(newApple));
 
         apple = newApple;
+        GameLogger.fine("New apple spawned at: " + apple);
     }
 
     public BoardPanel() {
-
+        GameLogger.info("Game started!");
         setBackground(Color.GRAY);
         setFocusable(true);
         requestFocusInWindow();
@@ -63,9 +67,15 @@ public class BoardPanel extends JPanel implements Runnable {
     }
 
     private void startGame() {
+        if (running) {
+            GameLogger.warning("Game already running");
+            return;
+        }
+
         running = true;
         gameThread = new Thread(this);
         gameThread.start();
+        GameLogger.info("Game thread started");
     }
 
     @Override
@@ -98,9 +108,12 @@ public class BoardPanel extends JPanel implements Runnable {
 
             try { Thread.sleep(1); } catch(Exception e){}
         }
+
+        GameLogger.info("Thread " + Thread.currentThread().getId() + " ended");
     }
 
     private void update() {
+        if (dx == 0 && dy == 0) return;
 
         // Kopf holen
         Point head = snake.get(0);
@@ -115,7 +128,7 @@ public class BoardPanel extends JPanel implements Runnable {
         if (newHead.x < 0 || newHead.y < 0 ||
                 newHead.x * TILE >= getWidth() ||
                 newHead.y * TILE >= getHeight()) {
-
+            GameLogger.warning("Game Over - Wall collision at: " + newHead);
             gameOver();
             return;
         }
@@ -132,7 +145,6 @@ public class BoardPanel extends JPanel implements Runnable {
         } else {
             spawnApple();
         }
-
     }
 
     private void gameOver() {
@@ -183,15 +195,19 @@ public class BoardPanel extends JPanel implements Runnable {
 
             if (key == KeyEvent.VK_UP && dy != 1) {
                 dx = 0; dy = -1;
+                GameLogger.fine("Direction changed: UP");
             }
             if (key == KeyEvent.VK_DOWN && dy != -1) {
                 dx = 0; dy = 1;
+                GameLogger.fine("Direction changed: DOWN");
             }
             if (key == KeyEvent.VK_LEFT && dx != 1) {
                 dx = -1; dy = 0;
+                GameLogger.fine("Direction changed: LEFT");
             }
             if (key == KeyEvent.VK_RIGHT && dx != -1) {
                 dx = 1; dy = 0;
+                GameLogger.fine("Direction changed: RIGHT");
             }
         }
     }
