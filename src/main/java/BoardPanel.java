@@ -11,7 +11,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.Timer;
 
-@SuppressWarnings("ALL")
+@SuppressWarnings("SpellCheckingInspection")
 public class BoardPanel extends JPanel {
 
     private final static int MOVE_SPEED = 120;
@@ -19,12 +19,10 @@ public class BoardPanel extends JPanel {
     private Timer renderTimer;
     private final int TILE = 20;
 
-    // Schlange, besteht aus Punkten
-    private final List<Point> snake = new LinkedList<>();
+    // Schlange, besteht aus Segmente
+    private final List<SnakeSegment> snake = new LinkedList<>();
 
     //Interpolation
-    private float currentX = 5.0f;
-    private float currentY = 5.0f;
     private int targetX = 5;
     private int targetY = 5;
     private long lastMoveTime = 0;
@@ -32,6 +30,8 @@ public class BoardPanel extends JPanel {
     // Richtung in Grid-Steps
     private int dx = 0;
     private int dy = 0;
+    private int nextDx = 0;
+    private int nextDy = 0;
     private float snapshotX = 5.0f;
     private float snapshotY = 5.0f;
 
@@ -66,7 +66,16 @@ public class BoardPanel extends JPanel {
             int x = (int) (Math.random() * (maxX * 0.8)) + (int)(maxX * 0.1);
             int y = (int) (Math.random() * (maxY * 0.8)) + (int)(maxY * 0.1);
             newApple = new Point(x, y);
-        } while (snake.contains(newApple));
+
+            boolean collision = false;
+            for (SnakeSegment seg : snake) {
+                if (seg.getGridPosition().equals(newApple)) {
+                    collision = true;
+                    break;
+                }
+            }
+                if (!collision) break;
+        } while (true);
 
         apple = newApple;
         GameLogger.fine("New apple spawned at: " + apple);
@@ -74,10 +83,8 @@ public class BoardPanel extends JPanel {
 
     private void initGame() {
         snake.clear();
-        snake.add(new Point(5, 5));
+        snake.add(new SnakeSegment(5, 5));
 
-        currentX = 5.0f;
-        currentY = 5.0f;
         targetX = 5;
         targetY = 5;
         lastMoveTime = 0;
@@ -109,18 +116,25 @@ public class BoardPanel extends JPanel {
     }
 
     private void updateInterpolation() {
-        if (dx == 0 && dy == 0) return;
 
         long now = System.currentTimeMillis();
         long elapsed = now - lastMoveTime;
 
         // nächster grid move
         if (elapsed >= MOVE_SPEED) {
+
+            if (nextDx != 0 || nextDy != 0) {
+                dx = nextDx;
+                dy = nextDy;
+                nextDx = 0;
+                nextDy = 0;
+            }
+
             // die Bewegung an sich
             if (dx != 0 || dy != 0) {
+
                 snapshotX = targetX;
                 snapshotY = targetY;
-
                 targetX += dx;
                 targetY += dy;
 
@@ -132,30 +146,65 @@ public class BoardPanel extends JPanel {
                     return;
                 }
 
-                // snake liste update
-                Point newHead = new Point(targetX, targetY);
+                //snapshots of every segment
+                for (SnakeSegment seg : snake) {
+                    seg.updateSnapshot();
+                }
 
-                if (snake.contains(newHead)) {
-                    gameOver();
-                    return;
+                // snake liste update
+                SnakeSegment newHead = new SnakeSegment(targetX, targetY);
+                SnakeSegment oldHead = snake.get(0);
+                newHead.setSnapshot(oldHead.getCurrentX(), oldHead.getCurrentY());
+                newHead.setCurrent(oldHead.getCurrentX(), oldHead.getCurrentY());
+
+                //selbstkollision check
+                for (SnakeSegment seg : snake) {
+                    if (seg.getGridPosition().equals(newHead.getGridPosition())) {
+                        gameOver();
+                        return;
+                    }
                 }
 
                 snake.add(0, newHead);
 
-                // Apfel check
-                if (targetX == apple.x && targetY == apple.y) {
+                boolean ateApple = (targetX == apple.x && targetY == apple.y);
+
+                if (ateApple) {
+                    GameLogger.info("Apple eaten! Snake length: " + snake.size());
                     spawnApple();
                 } else {
                     snake.remove(snake.size() - 1);
                 }
+
+                int limit = ateApple ? snake.size() - 1 : snake.size();
+                for (int i = limit - 1; i >= 1; i--) {
+                    SnakeSegment current = snake.get(i);
+                    SnakeSegment prev = snake.get(i - 1);
+                    Point prevGrid = prev.getGridPosition();
+                    current.setGridPosition(prevGrid.x, prevGrid.y);
+                }
+
+                // Apfel check
+                lastMoveTime = now;
             }
-            lastMoveTime = now;
         } else {
             // interpolation
             float progress = elapsed / (float) MOVE_SPEED;
+            progress = Math.min(progress, 1.0f);
 
-            currentX = snapshotX + (targetX - snapshotX) * progress;
-            currentY = snapshotY + (targetY - snapshotY) * progress;
+
+            for (int i = 0; i < snake.size(); i++) {
+                SnakeSegment seg = snake.get(i);
+
+                if (i == 0) {
+                    //kopf interpoliert zum target
+                    seg.interpolate(progress, targetX, targetY);
+                } else {
+                    //body interpoliert zur gridposition des verherigen segments
+                    Point myGrid = seg.getGridPosition();
+                    seg.interpolate(progress, myGrid.x, myGrid.y);
+                }
+            }
         }
     }
 
@@ -193,14 +242,14 @@ public class BoardPanel extends JPanel {
         g.setColor(Color.RED);
         g.fillRect(apple.x * TILE, apple.y * TILE, TILE, TILE);
 
-        // Kopf interpoliert
+        //Schlange interpoliert
         g.setColor(Color.GREEN);
-        g.fillRect((int)(currentX * TILE), (int)(currentY * TILE), TILE, TILE);
-
-        // Body bleibt bei der alten Animation
-        for (int i = 1; i < snake.size(); i++) {
-            Point p = snake.get(i);
-            g.fillRect(p.x * TILE, p.y * TILE, TILE, TILE);
+        for (SnakeSegment seg : snake) {
+            g.fillRect(
+                    (int)(seg.getCurrentX() * TILE),
+                    (int)(seg.getCurrentY() * TILE),
+                    TILE, TILE
+            );
         }
 
         Toolkit.getDefaultToolkit().sync();
@@ -213,40 +262,24 @@ public class BoardPanel extends JPanel {
 
             int key = e.getKeyCode();
 
-            if (key == KeyEvent.VK_UP && dy != 1) {
-                snapshotX = currentX;
-                snapshotY = currentY;
-                targetX = Math.round(currentX);
-                targetY = Math.round(currentY) - 1;
-                dx = 0; dy = -1;
-                lastMoveTime = System.currentTimeMillis();
+            if (key == KeyEvent.VK_UP && dy != 1 && nextDy != 1) {
+                nextDx = 0;
+                nextDy = -1;
                 GameLogger.fine("Direction changed: UP");
             }
-            if (key == KeyEvent.VK_DOWN && dy != -1) {
-                snapshotX = currentX;
-                snapshotY = currentY;
-                targetX = Math.round(currentX);
-                targetY = Math.round(currentY) + 1;
-                dx = 0; dy = 1;
-                lastMoveTime = System.currentTimeMillis();
+            if (key == KeyEvent.VK_DOWN && dy != -1 && nextDy != -1) {
+                nextDx = 0;
+                nextDy = 1;
                 GameLogger.fine("Direction changed: DOWN");
             }
-            if (key == KeyEvent.VK_LEFT && dx != 1) {
-                snapshotX = currentX;
-                snapshotY = currentY;
-                targetX = Math.round(currentX) - 1;
-                targetY = Math.round(currentY);
-                dx = -1; dy = 0;
-                lastMoveTime = System.currentTimeMillis();
+            if (key == KeyEvent.VK_LEFT && dx != 1 && nextDx != 1) {
+                nextDx = -1;
+                nextDy = 0;
                 GameLogger.fine("Direction changed: LEFT");
             }
-            if (key == KeyEvent.VK_RIGHT && dx != -1) {
-                snapshotX = currentX;
-                snapshotY = currentY;
-                targetX = Math.round(currentX) + 1;
-                targetY = Math.round(currentY);
-                dx = 1; dy = 0;
-                lastMoveTime = System.currentTimeMillis();
+            if (key == KeyEvent.VK_RIGHT && dx != -1 && nextDx != -1) {
+                nextDx = 1;
+                nextDy = 0;
                 GameLogger.fine("Direction changed: RIGHT");
             }
         }
