@@ -27,9 +27,25 @@ public class BoardPanel extends JPanel implements Runnable {
     private Thread gameThread;
     private boolean running = false;
 
+    private void spawnApple() {
+        int maxX = getWidth() / TILE;
+        int maxY = getHeight() / TILE;
+
+        Point newApple;
+
+        do {
+            // apfel spawnt zwichen 0% und 90% von der mitte des feldes nie ganz außen vllt kann man so mit den schwirigkeiten spielen
+            int x = (int) (Math.random() * (maxX * 0.8)) + (int)(maxX * 0.1);
+            int y = (int) (Math.random() * (maxY * 0.8)) + (int)(maxY * 0.1);
+            newApple = new Point(x, y);
+        } while (snake.contains(newApple));
+
+        apple = newApple;
+    }
+
     public BoardPanel() {
 
-        setBackground(Color.BLACK);
+        setBackground(Color.GRAY);
         setFocusable(true);
         requestFocusInWindow();
 
@@ -91,6 +107,9 @@ public class BoardPanel extends JPanel implements Runnable {
 
         // Neue Kopfposition
         Point newHead = new Point(head.x + dx, head.y + dy);
+        LinkedList<Point> snakeCopy = new LinkedList<>(snake);
+        snakeCopy.removeFirst();
+        if (snakeCopy.contains(newHead)) gameOver();
 
         //Spielrand, Spiel endet wenn Wand berührt
         if (newHead.x < 0 || newHead.y < 0 ||
@@ -110,14 +129,32 @@ public class BoardPanel extends JPanel implements Runnable {
         // Wenn kein Apfel gegessen wird der Schwanz gelöscht (sonst unendlich Schlange)
         if (!ateApple) {
             snake.remove(snake.size() - 1);
+        } else {
+            spawnApple();
         }
 
     }
 
     private void gameOver() {
+        // TODO: komplett verbugged -> Thread overloading
         running = false;
-        JOptionPane.showMessageDialog(this, "GAME OVER!");
-        System.exit(0);
+        String[] options = {"Neues Spiel", "Spiel Beenden"};
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                "Game Over!",
+                "Snake",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.INFORMATION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+        //neues Spiel starten
+        if (choice == 0) {
+
+        } else {
+            System.exit(0);
+        }
     }
 
     @Override
