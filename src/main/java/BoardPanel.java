@@ -9,8 +9,9 @@ import java.util.List;
 
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.Timer;
 
-public class BoardPanel extends JPanel implements Runnable {
+public class BoardPanel extends JPanel {
 
     private final int TILE = 20;
 
@@ -24,7 +25,7 @@ public class BoardPanel extends JPanel implements Runnable {
     // Apfel (feste Position)
     private Point apple = new Point(10, 10);
 
-    private Thread gameThread;
+    private Timer gameTimer;
     private boolean running = false;
 
     private void spawnApple() {
@@ -61,9 +62,13 @@ public class BoardPanel extends JPanel implements Runnable {
 
     private void initGame() {
         snake.clear();
-
-        // Kopf
         snake.add(new Point(5, 5));
+
+        dx = 0;
+        dy = 0;
+
+        spawnApple();
+        GameLogger.info("Game initialized");
     }
 
     private void startGame() {
@@ -73,58 +78,30 @@ public class BoardPanel extends JPanel implements Runnable {
         }
 
         running = true;
-        gameThread = new Thread(this);
-        gameThread.start();
-        GameLogger.info("Game thread started");
-    }
 
-    @Override
-    public void run() {
+        // Timer: alle 200ms wird update() + repaint() aufgerufen
+        gameTimer = new Timer(200, e -> {
+            update();
+            repaint();
+        });
 
-        final int FPS = 60;
-        final double FRAME_TIME = 1_000_000_000.0 / FPS;
-
-        final long MOVE_DELAY = 100_000_000; // 100 ms pro Step
-        long lastMove = System.nanoTime();
-
-        double delta = 0;
-        long lastTime = System.nanoTime();
-
-        while (running) {
-
-            long now = System.nanoTime();
-            delta += (now - lastTime) / FRAME_TIME;
-            lastTime = now;
-
-            if (now - lastMove >= MOVE_DELAY) {
-                update();
-                lastMove = now;
-            }
-
-            while (delta >= 1) {
-                repaint();
-                delta--;
-            }
-
-            try { Thread.sleep(1); } catch(Exception e){}
-        }
-
-        GameLogger.info("Thread " + Thread.currentThread().getId() + " ended");
+        gameTimer.start();
+        GameLogger.info("Game timer started");
     }
 
     private void update() {
         if (dx == 0 && dy == 0) return;
 
-        // Kopf holen
         Point head = snake.get(0);
-
-        // Neue Kopfposition
         Point newHead = new Point(head.x + dx, head.y + dy);
+
         LinkedList<Point> snakeCopy = new LinkedList<>(snake);
         snakeCopy.removeFirst();
-        if (snakeCopy.contains(newHead)) gameOver();
+        if (snakeCopy.contains(newHead)) {
+            gameOver();
+            return;
+        }
 
-        //Spielrand, Spiel endet wenn Wand berührt
         if (newHead.x < 0 || newHead.y < 0 ||
                 newHead.x * TILE >= getWidth() ||
                 newHead.y * TILE >= getHeight()) {
@@ -133,27 +110,30 @@ public class BoardPanel extends JPanel implements Runnable {
             return;
         }
 
-        //Apfel gegessen?
         boolean ateApple = newHead.equals(apple);
 
-        // Kopf an vorderste Stelle packen
         snake.add(0, newHead);
 
-        // Wenn kein Apfel gegessen wird der Schwanz gelöscht (sonst unendlich Schlange)
         if (!ateApple) {
             snake.remove(snake.size() - 1);
         } else {
+            GameLogger.info("Apple eaten! Snake length: " + snake.size());
             spawnApple();
         }
     }
 
     private void gameOver() {
-        // TODO: komplett verbugged -> Thread overloading
         running = false;
+
+        if (gameTimer != null) {
+            gameTimer.stop();  // Timer stoppen - fertig!
+            GameLogger.info("Game timer stopped");
+        }
+
         String[] options = {"Neues Spiel", "Spiel Beenden"};
         int choice = JOptionPane.showOptionDialog(
                 this,
-                "Game Over!",
+                "Game Over! Score: " + (snake.size() - 1),
                 "Snake",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.INFORMATION_MESSAGE,
@@ -161,9 +141,10 @@ public class BoardPanel extends JPanel implements Runnable {
                 options,
                 options[0]
         );
-        //neues Spiel starten
-        if (choice == 0) {
 
+        if (choice == 0) {
+            initGame();
+            startGame();
         } else {
             System.exit(0);
         }
