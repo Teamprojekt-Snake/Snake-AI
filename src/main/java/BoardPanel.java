@@ -11,22 +11,46 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.Timer;
 
+@SuppressWarnings("ALL")
 public class BoardPanel extends JPanel {
 
+    private final static int MOVE_SPEED = 120;
+    private Timer movementTimer;
+    private Timer renderTimer;
     private final int TILE = 20;
 
     // Schlange, besteht aus Punkten
     private final List<Point> snake = new LinkedList<>();
 
+    //Interpolation
+    private float currentX = 5.0f;
+    private float currentY = 5.0f;
+    private int targetX = 5;
+    private int targetY = 5;
+    private long lastMoveTime = 0;
+
     // Richtung in Grid-Steps
     private int dx = 0;
     private int dy = 0;
+    private float snapshotX = 5.0f;
+    private float snapshotY = 5.0f;
 
     // Apfel (feste Position)
     private Point apple = new Point(10, 10);
 
-    private Timer gameTimer;
     private boolean running = false;
+
+    public BoardPanel() {
+        GameLogger.info("Game started!");
+        setBackground(Color.GRAY);
+        setFocusable(true);
+        requestFocusInWindow();
+
+        addKeyListener(new KeyHandler());
+
+        initGame();
+        startGame();
+    }
 
     private void spawnApple() {
         int maxX = getWidth() / TILE;
@@ -48,21 +72,17 @@ public class BoardPanel extends JPanel {
         GameLogger.fine("New apple spawned at: " + apple);
     }
 
-    public BoardPanel() {
-        GameLogger.info("Game started!");
-        setBackground(Color.GRAY);
-        setFocusable(true);
-        requestFocusInWindow();
-
-        addKeyListener(new KeyHandler());
-
-        initGame();
-        startGame();
-    }
-
     private void initGame() {
         snake.clear();
         snake.add(new Point(5, 5));
+
+        currentX = 5.0f;
+        currentY = 5.0f;
+        targetX = 5;
+        targetY = 5;
+        lastMoveTime = 0;
+        snapshotX = 5.0f;
+        snapshotY = 5.0f;
 
         dx = 0;
         dy = 0;
@@ -78,57 +98,72 @@ public class BoardPanel extends JPanel {
         }
 
         running = true;
+        lastMoveTime = System.currentTimeMillis();
 
-        // Timer: alle 200ms wird update() + repaint() aufgerufen
-        gameTimer = new Timer(200, e -> {
-            update();
+        renderTimer = new Timer(16, e -> {
+            updateInterpolation();
             repaint();
         });
-
-        gameTimer.start();
-        GameLogger.info("Game timer started");
+        renderTimer.start();
+        GameLogger.info("Game timers started (Movement: 200ms, Render: 60 FPS)");
     }
 
-    private void update() {
+    private void updateInterpolation() {
         if (dx == 0 && dy == 0) return;
 
-        Point head = snake.get(0);
-        Point newHead = new Point(head.x + dx, head.y + dy);
+        long now = System.currentTimeMillis();
+        long elapsed = now - lastMoveTime;
 
-        LinkedList<Point> snakeCopy = new LinkedList<>(snake);
-        snakeCopy.removeFirst();
-        if (snakeCopy.contains(newHead)) {
-            gameOver();
-            return;
-        }
+        // nächster grid move
+        if (elapsed >= MOVE_SPEED) {
+            // die Bewegung an sich
+            if (dx != 0 || dy != 0) {
+                snapshotX = targetX;
+                snapshotY = targetY;
 
-        if (newHead.x < 0 || newHead.y < 0 ||
-                newHead.x * TILE >= getWidth() ||
-                newHead.y * TILE >= getHeight()) {
-            GameLogger.warning("Game Over - Wall collision at: " + newHead);
-            gameOver();
-            return;
-        }
+                targetX += dx;
+                targetY += dy;
 
-        boolean ateApple = newHead.equals(apple);
+                //Kollisionen checken
+                if (targetX < 0 || targetY < 0 ||
+                        targetX >= getWidth() / TILE ||
+                        targetY >= getHeight() / TILE) {
+                    gameOver();
+                    return;
+                }
 
-        snake.add(0, newHead);
+                // snake liste update
+                Point newHead = new Point(targetX, targetY);
 
-        if (!ateApple) {
-            snake.remove(snake.size() - 1);
+                if (snake.contains(newHead)) {
+                    gameOver();
+                    return;
+                }
+
+                snake.add(0, newHead);
+
+                // Apfel check
+                if (targetX == apple.x && targetY == apple.y) {
+                    spawnApple();
+                } else {
+                    snake.remove(snake.size() - 1);
+                }
+            }
+            lastMoveTime = now;
         } else {
-            GameLogger.info("Apple eaten! Snake length: " + snake.size());
-            spawnApple();
+            // interpolation
+            float progress = elapsed / (float) MOVE_SPEED;
+
+            currentX = snapshotX + (targetX - snapshotX) * progress;
+            currentY = snapshotY + (targetY - snapshotY) * progress;
         }
     }
 
     private void gameOver() {
         running = false;
 
-        if (gameTimer != null) {
-            gameTimer.stop();  // Timer stoppen - fertig!
-            GameLogger.info("Game timer stopped");
-        }
+        if (renderTimer != null) renderTimer.stop();
+        GameLogger.info("Game timers stopped");
 
         String[] options = {"Neues Spiel", "Spiel Beenden"};
         int choice = JOptionPane.showOptionDialog(
@@ -158,9 +193,13 @@ public class BoardPanel extends JPanel {
         g.setColor(Color.RED);
         g.fillRect(apple.x * TILE, apple.y * TILE, TILE, TILE);
 
-        //Schlange
+        // Kopf interpoliert
         g.setColor(Color.GREEN);
-        for (Point p : snake) {
+        g.fillRect((int)(currentX * TILE), (int)(currentY * TILE), TILE, TILE);
+
+        // Body bleibt bei der alten Animation
+        for (int i = 1; i < snake.size(); i++) {
+            Point p = snake.get(i);
             g.fillRect(p.x * TILE, p.y * TILE, TILE, TILE);
         }
 
@@ -175,19 +214,39 @@ public class BoardPanel extends JPanel {
             int key = e.getKeyCode();
 
             if (key == KeyEvent.VK_UP && dy != 1) {
+                snapshotX = currentX;
+                snapshotY = currentY;
+                targetX = Math.round(currentX);
+                targetY = Math.round(currentY) - 1;
                 dx = 0; dy = -1;
+                lastMoveTime = System.currentTimeMillis();
                 GameLogger.fine("Direction changed: UP");
             }
             if (key == KeyEvent.VK_DOWN && dy != -1) {
+                snapshotX = currentX;
+                snapshotY = currentY;
+                targetX = Math.round(currentX);
+                targetY = Math.round(currentY) + 1;
                 dx = 0; dy = 1;
+                lastMoveTime = System.currentTimeMillis();
                 GameLogger.fine("Direction changed: DOWN");
             }
             if (key == KeyEvent.VK_LEFT && dx != 1) {
+                snapshotX = currentX;
+                snapshotY = currentY;
+                targetX = Math.round(currentX) - 1;
+                targetY = Math.round(currentY);
                 dx = -1; dy = 0;
+                lastMoveTime = System.currentTimeMillis();
                 GameLogger.fine("Direction changed: LEFT");
             }
             if (key == KeyEvent.VK_RIGHT && dx != -1) {
+                snapshotX = currentX;
+                snapshotY = currentY;
+                targetX = Math.round(currentX) + 1;
+                targetY = Math.round(currentY);
                 dx = 1; dy = 0;
+                lastMoveTime = System.currentTimeMillis();
                 GameLogger.fine("Direction changed: RIGHT");
             }
         }
