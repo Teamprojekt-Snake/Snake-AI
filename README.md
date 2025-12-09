@@ -95,6 +95,11 @@ src/main/java/
 └── GameLogger.java         # Logging Utility
 ```
 
+## Entwickler
+
+- Razvan-Constantin Grumaz
+- cedi333
+
 ## Entwicklungshinweise
 
 Diese README-Dokumentation wurde mithilfe von Claude Sonnet 4.5 verbessert und verfeinert.
