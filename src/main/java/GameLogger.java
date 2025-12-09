@@ -22,8 +22,8 @@ public class GameLogger {
             Path logFile = logsDir.resolve("snake_game.log");
             System.out.println("Log file path: " + logFile.toAbsolutePath());
 
-            FileHandler fileHandler = new FileHandler(logFile.toString(), false);
-            fileHandler.setLevel(Level.ALL);
+            FileHandler fileHandler = new FileHandler(logFile.toString(), 10485760, 3, false);
+            fileHandler.setLevel(Level.INFO);
             fileHandler.setFormatter(new SimpleFormatter());
             logger.addHandler(fileHandler);
 
@@ -31,7 +31,7 @@ public class GameLogger {
             consoleHandler.setLevel(Level.INFO);
             logger.addHandler(consoleHandler);
 
-            logger.setLevel(Level.ALL);
+            logger.setLevel(Level.INFO);
             logger.setUseParentHandlers(false);
 
             logger.info("Logging initialized successfully!");
