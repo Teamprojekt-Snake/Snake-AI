@@ -372,7 +372,7 @@ public class Snake_GUI extends JFrame {
                         "<b>Highscore vom Manual Play: </b>" +
                         Highscore +
                         "</center></html>",
-                "Training Required",
+                "Highscore",
                 JOptionPane.DEFAULT_OPTION,
                 JOptionPane.INFORMATION_MESSAGE,
                 null,

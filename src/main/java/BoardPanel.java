@@ -65,9 +65,6 @@ public class BoardPanel extends JPanel {
         setFocusable(true);
         requestFocusInWindow();
         //FIXME .prp file should be in folder "data"
-        /**
-         * FIXME "Highscore" button that shows the highscore
-         */
         PropConfig.loadProperties();
         highscore = PropConfig.properties.getProperty("Highscore","0");
         highscoreINT = Integer.parseInt(PropConfig.properties.getProperty("Highscore"));
