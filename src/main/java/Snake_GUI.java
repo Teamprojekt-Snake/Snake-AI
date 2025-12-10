@@ -65,12 +65,19 @@ public class Snake_GUI extends JFrame {
         buttonPanel.setLayout(new GridLayout(3, 1, 10, 15));
 
         JButton manualButton = createStyledButton("Manual Play", new Color(52, 152, 219));
+        JButton highscoreButton = createStyledButton("Highscore", new Color(231, 76, 60));
         JButton trainingButton = createStyledButton("AI Training", new Color(231, 76, 60));
         JButton aiPlayButton = createStyledButton("AI Play", new Color(46, 204, 113));
+
 
         manualButton.addActionListener(e -> {
             dialog.dispose();
             startManualMode();
+        });
+
+        highscoreButton.addActionListener(e -> {
+            dialog.dispose();
+            openHighScoreText();
         });
 
         trainingButton.addActionListener(e -> {
@@ -84,6 +91,7 @@ public class Snake_GUI extends JFrame {
         });
 
         buttonPanel.add(manualButton);
+        buttonPanel.add(highscoreButton);
         buttonPanel.add(trainingButton);
         buttonPanel.add(aiPlayButton);
         buttonPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -349,6 +357,34 @@ public class Snake_GUI extends JFrame {
             trainingDialog.setLocationRelativeTo(null);
             trainingDialog.setVisible(true);
         }
+    }
+
+    /**
+     * Oeffnet Highscore Textfeld
+     */
+    private void openHighScoreText(){
+        board = new BoardPanel();
+        PropConfig.loadProperties();
+        String Highscore = PropConfig.properties.getProperty("Highscore");
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                "<html><center>" +
+                        "<b>Highscore vom Manual Play: </b>" +
+                        Highscore +
+                        "</center></html>",
+                "Training Required",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.INFORMATION_MESSAGE,
+                null,
+                new String[]{"Zurück zum Menü"},
+                "Zurück zum Menü"
+        );
+
+        if (choice != 1) {
+            showModeSelection();
+            return;
+        }
+
     }
 
     /**
