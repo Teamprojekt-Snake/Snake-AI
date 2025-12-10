@@ -3,6 +3,7 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 import javax.swing.*;
 
 /**
@@ -17,6 +18,8 @@ public class BoardPanel extends JPanel {
     private final int FIELD_HEIGHT = 30;
     private boolean paused = false;
     private int score = 0;
+    private String highscore;
+    private int highscoreINT;
 
     private final List<Point> snake = new LinkedList<>();
 
@@ -61,6 +64,11 @@ public class BoardPanel extends JPanel {
         setBackground(Color.GRAY);
         setFocusable(true);
         requestFocusInWindow();
+        //FIXME .prp file should be in folder "data"
+        PropConfig.loadProperties();
+        highscore = PropConfig.properties.getProperty("Highscore","0");
+        highscoreINT = Integer.parseInt(PropConfig.properties.getProperty("Highscore"));
+
 
         addKeyListener(new KeyHandler());
 
@@ -130,7 +138,7 @@ public class BoardPanel extends JPanel {
 
         running = true;
 
-        int timerDelay = (mode == GameMode.TRAINING) ? 10 : 70;
+        int timerDelay = (mode == GameMode.TRAINING) ? 10 : 100;
 
         gameTimer = new Timer(timerDelay, e -> {
             update();
@@ -169,7 +177,10 @@ public class BoardPanel extends JPanel {
             );
         } else {
             options = new String[]{"Resume", "Main Menu", "Exit"};
-            message = "Game Paused\n\nScore: " + score;
+            highscoreINT = Integer.parseInt(PropConfig.properties.getProperty("Highscore","0"));
+            message = "Game Paused\n" +
+                    "Score: " + score +
+                    "\nHighscore: " + highscore;
         }
 
         int choice = JOptionPane.showOptionDialog(
@@ -305,6 +316,11 @@ public class BoardPanel extends JPanel {
         } else {
             score++;
             GameLogger.info("Apple eaten! Snake length: " + snake.size());
+            if(score > highscoreINT){
+               highscoreINT = score;
+               highscore = String.valueOf(highscoreINT);
+                PropConfig.saveProperties("Highscore", highscore);
+            }
 
             if (mode == GameMode.TRAINING) {
                 GameState newState = calculateGameState();
@@ -320,6 +336,11 @@ public class BoardPanel extends JPanel {
      * Wird aufgerufen wenn das Spiel vorbei ist.
      */
     private void gameOver() {
+        highscoreINT = Integer.parseInt(PropConfig.properties.getProperty("Highscore","0"));
+        if(score > highscoreINT){
+            PropConfig.saveProperties("Highscore", String.valueOf(score));
+        }
+
         running = false;
 
         if (gameTimer != null) {
@@ -359,7 +380,9 @@ public class BoardPanel extends JPanel {
         String[] options = {"Neues Spiel", "Main Menu", "Spiel Beenden"};
         int choice = JOptionPane.showOptionDialog(
                 this,
-                "Game Over! Score: " + score,
+                "Game Over! " +
+                "\nScore: " + score
+                + "\nHighscore: " + highscore,
                 "Snake",
                 JOptionPane.DEFAULT_OPTION,
                 JOptionPane.INFORMATION_MESSAGE,
